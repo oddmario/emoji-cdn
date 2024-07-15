@@ -35,30 +35,38 @@ func updateDbThread(emoji string, active_threads_count_lock, emojis_count_lock *
 		return
 	}
 
-	for _, platform := range constants.EmojipediaPlatforms {
-		emoji_img_reader, file_ext, err := utils.EmojipediaScraper(emoji, platform)
+	readers, err := utils.EmojipediaScraper(emoji, constants.EmojipediaPlatforms)
 
-		if err != nil {
-			fmt.Println("scrape err", emoji, platform, err)
+	if err != nil {
+		fmt.Println("scrape err", emoji, err)
 
-			continue
-		}
+		active_threads_count_lock.Lock()
+		active_threads_count_lock.Set(int(active_threads_count_lock.Get().(int) - 1))
+		active_threads_count_lock.Unlock()
 
-		f, err := os.OpenFile(filepath.Join(".", ".emojis-db", emoji, platform+file_ext), os.O_CREATE|os.O_WRONLY, 0777)
+		emojis_count_lock.Lock()
+		emojis_count_lock.Set(int(emojis_count_lock.Get().(int) + 1))
+		emojis_count_lock.Unlock()
+
+		return
+	}
+
+	for filename, reader := range readers {
+		f, err := os.OpenFile(filepath.Join(".", ".emojis-db", emoji, filename), os.O_CREATE|os.O_WRONLY, 0777)
 		if err != nil {
 			fmt.Println("error while opening file", err)
 
-			emoji_img_reader.Close()
+			reader.Close()
 
 			continue
 		}
 
-		io.Copy(f, emoji_img_reader)
+		io.Copy(f, reader)
 
 		f.Close()
-		emoji_img_reader.Close()
+		reader.Close()
 
-		fmt.Println(emoji, platform, "has been scraped")
+		fmt.Println(emoji, filename, "has been scraped")
 	}
 
 	active_threads_count_lock.Lock()
@@ -117,12 +125,18 @@ func UpdateDb(maxThreads int) {
 
 	for scanner.Scan() {
 		for {
+			activeThreadsCountLock.Lock()
+
 			if activeThreadsCountLock.Get().(int) >= maxThreads {
-				time.Sleep(2 * time.Second)
+				activeThreadsCountLock.Unlock()
+
+				time.Sleep(1 * time.Second)
 
 				continue
 			} else {
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
+
+				activeThreadsCountLock.Unlock()
 
 				if activeThreadsCountLock.Get().(int) >= maxThreads {
 					continue

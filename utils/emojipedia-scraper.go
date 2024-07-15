@@ -10,7 +10,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func EmojipediaScraper(emoji, style string) (io.ReadCloser, string, error) {
+func EmojipediaScraper(emoji string, styles []string) (map[string]io.ReadCloser, error) {
 	var emojipedia_nextjs_key string = "Ac4U6X8McKS9ckPowL50Y"
 	var emojipedia_cdn_base string = "https://em-content.zobj.net/"
 
@@ -36,7 +36,7 @@ func EmojipediaScraper(emoji, style string) (io.ReadCloser, string, error) {
 			Get("https://emojipedia.org/_next/data/" + emojipedia_nextjs_key + "/en/search.json?q=" + url.QueryEscape(emoji))
 
 		if err != nil {
-			return nil, "", errors.New("an internal error has occurred")
+			return nil, errors.New("an internal error has occurred")
 		}
 
 		get_emoji_slug_body = get_emoji_slug.String()
@@ -49,7 +49,7 @@ func EmojipediaScraper(emoji, style string) (io.ReadCloser, string, error) {
 	}
 
 	if !strings.Contains(get_emoji_slug_body, "__N_REDIRECT") {
-		return nil, "", errors.New("invalid emojipedia response")
+		return nil, errors.New("invalid emojipedia response")
 	}
 
 	get_emoji_slug_parser := gjson.Parse(get_emoji_slug_body)
@@ -89,7 +89,7 @@ func EmojipediaScraper(emoji, style string) (io.ReadCloser, string, error) {
 			Post("https://emojipedia.org/api/graphql")
 
 		if err != nil {
-			return nil, "", errors.New("an internal error has occurred")
+			return nil, errors.New("an internal error has occurred")
 		}
 
 		get_emoji_body = get_emoji.String()
@@ -102,41 +102,47 @@ func EmojipediaScraper(emoji, style string) (io.ReadCloser, string, error) {
 	}
 
 	if !strings.Contains(get_emoji_body, emoji_slug) {
-		return nil, "", errors.New("invalid emojipedia response")
+		return nil, errors.New("invalid emojipedia response")
 	}
 
 	emoji_data := gjson.Parse(get_emoji_body).Get("data").Get("emoji_v1")
 
-	platformIndex := int64(-1)
+	readers := map[string]io.ReadCloser{}
 
-	emoji_data.Get("vendorsAndPlatforms").ForEach(func(key, value gjson.Result) bool {
-		if value.Get("slug").String() == style {
-			platformIndex = key.Int()
+	for _, style := range styles {
+		platformIndex := int64(-1)
 
-			return false
+		emoji_data.Get("vendorsAndPlatforms").ForEach(func(key, value gjson.Result) bool {
+			if value.Get("slug").String() == style {
+				platformIndex = key.Int()
+
+				return false
+			}
+
+			return true // keep iterating
+		})
+
+		if platformIndex < 0 {
+			continue // no emoji found for the specified style
 		}
 
-		return true // keep iterating
-	})
+		emoji_img := emojipedia_cdn_base + emoji_data.Get("vendorsAndPlatforms").Get(I64ToStr(platformIndex)).Get("items").Get("0").Get("image").Get("source").String()
 
-	if platformIndex < 0 {
-		return nil, "", errors.New("no emoji found for the specified style")
+		emoji_proxy, err := HttpClient.R().
+			SetDoNotParseResponse(true).
+			Get(emoji_img)
+
+		if err != nil {
+			continue // an internal error has occurred
+		}
+
+		u, _ := url.Parse(emoji_img)
+		ext := path.Ext(u.Path)
+
+		reader := emoji_proxy.RawResponse.Body
+
+		readers[style+ext] = reader
 	}
 
-	emoji_img := emojipedia_cdn_base + emoji_data.Get("vendorsAndPlatforms").Get(I64ToStr(platformIndex)).Get("items").Get("0").Get("image").Get("source").String()
-
-	emoji_proxy, err := HttpClient.R().
-		SetDoNotParseResponse(true).
-		Get(emoji_img)
-
-	if err != nil {
-		return nil, "", errors.New("an internal error has occurred")
-	}
-
-	u, _ := url.Parse(emoji_img)
-	ext := path.Ext(u.Path)
-
-	reader := emoji_proxy.RawResponse.Body
-
-	return reader, ext, nil
+	return readers, nil
 }
