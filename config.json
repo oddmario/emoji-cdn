@@ -1,0 +1,13 @@
+{
+    "listener": {
+        "type": "tcp",
+        "data": "0.0.0.0:19620"
+    },
+    "ssl": {
+        "enabled": false,
+        "key_path": "",
+        "cert_path": ""
+    },
+    "corsAllowAll": true,
+    "enable_pprof": false
+}

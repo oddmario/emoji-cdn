@@ -1,0 +1,16 @@
+[Unit]
+Description=emoji-cdn
+
+[Service]
+User=root
+WorkingDirectory=/root/emoji-cdn
+LimitNOFILE=1048576
+TasksMax=infinity
+ExecStart=/root/emoji-cdn/emoji-cdn_linux_amd64
+Restart=on-failure
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
