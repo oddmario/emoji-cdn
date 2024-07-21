@@ -10,8 +10,42 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+var nextjsBuildID string = ""
+
+func InitEmojipediaNextjsBuildID() error {
+	get_nextjs_build_id, err := HttpClient.R().
+		SetHeaders(map[string]string{
+			"User-Agent":      "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+			"Accept-Language": "en-US,en;q=0.5",
+			"Connection":      "keep-alive",
+			"Sec-Fetch-Dest":  "document",
+			"Sec-Fetch-Mode":  "navigate",
+			"Sec-Fetch-Site":  "cross-site",
+			"Priority":        "u=0",
+			"Pragma":          "no-cache",
+			"Cache-Control":   "no-cache",
+			"TE":              "trailers",
+		}).
+		Get("https://emojipedia.org/")
+
+	if err != nil {
+		return errors.New("failed to fetch the emojipedia next.js build id")
+	}
+
+	get_nextjs_build_id_body := get_nextjs_build_id.String()
+
+	if !strings.Contains(get_nextjs_build_id_body, "buildId") {
+		return errors.New("failed to fetch the emojipedia next.js build id")
+	}
+
+	nextjsBuildID = strings.Split(strings.Split(get_nextjs_build_id_body, `"buildId":"`)[1], `"`)[0]
+
+	return nil
+}
+
 func EmojipediaScraper(emoji string, styles []string) (map[string]io.ReadCloser, error) {
-	var emojipedia_nextjs_key string = "Ac4U6X8McKS9ckPowL50Y"
+	var emojipedia_nextjs_key string = nextjsBuildID
 	var emojipedia_cdn_base string = "https://em-content.zobj.net/"
 
 	var get_emoji_slug_body string = ""

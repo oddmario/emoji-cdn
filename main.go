@@ -25,6 +25,11 @@ func main() {
 	args := os.Args[1:]
 
 	if slices.Contains(args, "--update-db") {
+		err := utils.InitEmojipediaNextjsBuildID()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		dbUpdaterThreads := 0
 
 		for _, arg := range args {
