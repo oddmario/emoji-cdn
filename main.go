@@ -76,7 +76,7 @@ func main() {
 		Handler:           r,
 		ReadTimeout:       0,
 		WriteTimeout:      0,
-		IdleTimeout:       0,
+		IdleTimeout:       5 * time.Minute,
 		ReadHeaderTimeout: 30 * time.Second, // https://ieftimov.com/posts/make-resilient-golang-net-http-servers-using-timeouts-deadlines-context-cancellation/#server-timeouts---first-principles
 	}
 	httpServer.SetKeepAlivesEnabled(true)
